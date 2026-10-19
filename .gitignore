@@ -7,3 +7,13 @@ out/
 *.tsbuildinfo
 *.log
 .DS_Store
+
+.dev.vars
+.dev.vars.*
+.auth*/
+.qa*/
+.browser*/
+coverage/
+*Backup*/
+*backup*/
+*.zip

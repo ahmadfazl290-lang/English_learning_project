@@ -6,14 +6,13 @@ export default function CadenceClient(){
  useEffect(()=>{let active=true;
   (async()=>{
    try{
-    const r=await fetch('/api/session',{credentials:'same-origin'});if(!r.ok)throw new Error('Connection unavailable');
-    const session=await r.json();if(session.mode!=='hosted')throw new Error('Connection unavailable');
-    window.CADENCE_SESSION=session;
-    async function request(method,key,value){const r=await fetch('/api/storage',{method,credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({key,value})});const data=await r.json();if(!r.ok)throw new Error(data?.error||'Storage unavailable');return data;}
-    const unreadableKeys=new Set();
-    window.storage={get:async key=>{try{const data=await request('POST',key);unreadableKeys.delete(key);return data;}catch(e){unreadableKeys.add(key);window.dispatchEvent(new Event('cadence-save-error'));throw e;}},set:(key,value)=>{if(unreadableKeys.has(key))return Promise.reject(new Error('Reload before saving this record.'));return request('PUT',key,value);},delete:key=>request('DELETE',key)};
+    let id=localStorage.getItem('cadence:guest-id');
+    if(!id){id=crypto.randomUUID();localStorage.setItem('cadence:guest-id',id);}
+    window.CADENCE_SESSION={mode:'guest',development:false,emailAuth:false,emailConfigured:false,user:{userId:id,email:`${id}@guest.invalid`,displayName:'فێرخواز'}};
+    const prefix='cadence:guest-data:';
+    window.storage={get:async key=>{const value=localStorage.getItem(prefix+key);return value===null?null:{key,value};},set:async(key,value)=>{localStorage.setItem(prefix+key,value);return {key,value};},delete:async key=>{localStorage.removeItem(prefix+key);return {key,deleted:true};}};
     if(active)setReady(true);
-   }catch{if(active)setError('پەیوەندی بەردەست نییە. تکایە دووبارە هەوڵبدە.');}
+   }catch{if(active)setError('پاشەکەوتکردنی وێبگەڕ بەردەست نییە. ڕێگە بە پاشەکەوتکردنی داتا بدە و دووبارە هەوڵبدە.');}
   })();return()=>{active=false;};
  },[]);
  if(error)return <main dir="rtl" className="min-h-screen flex items-center justify-center"><div role="alert">{error}<button className="m-4 underline" onClick={()=>location.reload()}>دووبارە هەوڵبدە</button></div></main>;

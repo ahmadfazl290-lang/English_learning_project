@@ -44,6 +44,7 @@
     "node_modules",
     "examples",
     "components/ui",
-    "components/connector-error.tsx"
+    "components/connector-error.tsx",
+    "Cadence-*/**"
   ]
 }
