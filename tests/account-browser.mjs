@@ -26,7 +26,7 @@ try {
     localStorage.setItem('cadence:ui-language',sessionStorage.getItem('qa-language') || 'en');
     if(!localStorage.getItem('cadence:guest-data:profile:phase22-guest@guest.invalid'))localStorage.setItem('cadence:guest-data:profile:phase22-guest@guest.invalid',JSON.stringify(${JSON.stringify(profile)}));
     localStorage.setItem('cadence:guest-data:qa-preservation','preserved-progress');
-    window.qa={account:JSON.parse(sessionStorage.getItem('qa-account') || ${JSON.stringify(JSON.stringify(fixture))}),read:'normal',calls:[],realAuth:0};
+    window.qa={account:JSON.parse(sessionStorage.getItem('qa-account') || ${JSON.stringify(JSON.stringify(fixture))}),read:sessionStorage.getItem('qa-read')||'normal',calls:[],realAuth:0};
     const nativeFetch=window.fetch.bind(window);
     window.fetch=async(url,options={})=>{
       if(String(url)==='/api/supabase-mfa'){
@@ -65,29 +65,35 @@ try {
   await screenshot('account-settings-desktop-en');
   await evaluate("window.qa.account.providers=['email','google'];window.qa.account.twoFactor='enrolled';window.dispatchEvent(new Event('focus'))");
   await wait(`${accountText}?.includes('Google')`);await wait(`${accountText}?.includes('Enabled')`);
-  await evaluate("window.qa.account.verified=false;window.qa.account.confirmedAt=null;window.qa.account.twoFactor='unknown';window.dispatchEvent(new Event('focus'))");
-  await wait(`${accountText}?.includes('Not Verified')`);assert.equal(await evaluate("document.querySelector('.ec-account-verified')===null"),true);
+  await evaluate("window.qa.account.twoFactor='unknown';window.dispatchEvent(new Event('focus'))");
   await wait(`${accountText}?.includes('Status Unavailable')`);
-  reports.push('Linked-provider, enrolled-factor, unavailable-factor and unverified-account states are truthful');
-  await evaluate("window.qa.read='error';window.dispatchEvent(new Event('focus'))");
-  await wait("document.querySelector('.ec-account [role=alert]')");
-  assert.equal(await evaluate(`${accountText}.includes('student@example.test')`),false);
-  await evaluate("window.qa.read='normal'");await click('Try Again');await wait(`${accountText}?.includes('Registered Student')`);
-  reports.push('Refresh failures remove account details and provide a working retry');
+  reports.push('Linked-provider, enrolled-factor and unavailable-factor states remain truthful');
+  await evaluate("window.qa.account.verified=false;window.qa.account.confirmedAt=null;sessionStorage.setItem('qa-account',JSON.stringify(window.qa.account));window.dispatchEvent(new Event('focus'))");
+  await wait("location.pathname==='/account' && document.querySelector('form input[name=email]')");
+  assert.equal(await evaluate("document.body.innerText.includes('student@example.test')"),false);
+  reports.push('Unverified entry returns existing resend flow without exposing prior private details');
+  await evaluate(`sessionStorage.setItem('qa-account',${JSON.stringify(JSON.stringify(fixture))})`);
+  await navigate('/');await wait(`[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Settings')`);await click('Settings');await wait(`${accountText}?.includes('Registered Student')`);
+  await evaluate("window.qa.read='error';sessionStorage.setItem('qa-read','error');window.dispatchEvent(new Event('focus'))");
+  await wait("location.pathname==='/account' && document.querySelector('.ec-entry-account-frame [role=alert]')");
+  assert.equal(await evaluate("document.body.innerText.includes('student@example.test')"),false);
+  await evaluate("sessionStorage.setItem('qa-read','normal')");
+  await navigate('/');await wait(`[...document.querySelectorAll('button')].some(b=>b.textContent.trim()==='Settings')`);await click('Settings');await wait(`${accountText}?.includes('Registered Student')`);
+  reports.push('Failed root refresh removes account details and supplies retry; a fresh check restores valid settings');
   await evaluate("window.qa.read='delayed';window.dispatchEvent(new Event('focus'))");
-  await wait('window.qa.release');assert.equal(await evaluate("document.querySelector('.ec-account').getAttribute('aria-busy')"),'true');
+  await wait('window.qa.release');assert.equal(await evaluate("document.querySelector('[data-entry-state=account]').hidden"),true);
   await evaluate("window.qa.account.fullName='Second Student';window.qa.account.email='second@example.test';window.qa.read='normal';window.dispatchEvent(new Event('focus'))");
   await wait(`${accountText}?.includes('Second Student')`);
   await evaluate('window.qa.release()');
   assert.equal(await evaluate(`${accountText}.includes('Registered Student')`),false);
   reports.push('Loading and account switching discard stale in-flight responses');
-  await click('Sign Out');await wait(`${accountText}?.includes('currently learning as a guest')`);
-  assert.equal(await evaluate(`${accountText}.includes('Second Student')`),false);
-  assert.equal(await evaluate("document.querySelector('.ec-account a[href*=signup]')!==null"),true);
+  await click('Sign Out');await wait("location.pathname==='/account' && document.querySelector('input[name=email]')");
+  assert.equal(await evaluate("document.body.innerText.includes('Second Student')"),false);
+  assert.equal(await evaluate("[...document.querySelectorAll('button')].some(b=>b.textContent==='Create Account')"),true);
   assert.equal(await evaluate("localStorage.getItem('cadence:guest-data:profile:phase22-guest@guest.invalid')"),originalProfile);
   assert.equal(await evaluate("localStorage.getItem('cadence:guest-data:qa-preservation')"),'preserved-progress');
   assert.equal(await evaluate("localStorage.getItem('cadence:guest-id')"),'phase22-guest');
-  reports.push('Logout clears account details; guest links and placement/progress storage are preserved');
+  reports.push('Logout returns existing sign-in entrance; placement/progress storage is preserved');
   for(const language of ['en','ku']){
     await evaluate(`sessionStorage.setItem('qa-language',${JSON.stringify(language)});sessionStorage.setItem('qa-account',${JSON.stringify(JSON.stringify(fixture))})`);
     await navigate('/account?provider=supabase');await wait("document.querySelector('.ec-account dd')");

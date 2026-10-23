@@ -15,7 +15,7 @@ const send=(method,params={})=>new Promise((resolve,reject)=>{const n=++id;pendi
 const ev=async expression=>{let r;try{r=await send('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true,userGesture:true});}catch(error){throw Error(error.message+' in '+expression);}if(r.exceptionDetails)throw Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;};
 async function wait(expr){for(let i=0;i<160;i++){if(await ev(`Boolean(${expr})`))return;await new Promise(r=>setTimeout(r,100));}throw Error('Timed out: '+expr);}
 async function click(text){await wait(`[...document.querySelectorAll('button')].some(b=>b.getClientRects().length&&!b.disabled&&b.textContent.trim()===${JSON.stringify(text)})`);await ev(`(()=>{[...document.querySelectorAll('button')].find(b=>b.getClientRects().length&&!b.disabled&&b.textContent.trim()===${JSON.stringify(text)}).click()})()`);}
-async function nav(){await send('Page.navigate',{url:origin});await wait('document.querySelector("aside")');}
+async function nav(){await send('Page.navigate',{url:origin+'/?guest=1'});await wait('document.querySelector("aside")');}
 const snapshot=()=>ev(`JSON.stringify(Object.fromEntries(Object.keys(localStorage).filter(k=>k.startsWith('cadence:guest-data:')).sort().map(k=>[k,localStorage.getItem(k)])))`);
 const assessment=scorePlacement(PLACEMENT_QUESTIONS.map(q=>({id:q.id,answer:'__unknown__'})));
 const profile={name:'Local QA Learner',email:'integration-fixture@guest.invalid',nativeLanguage:'',targetLanguage:'English',englishLevel:null,priorities:[],learningGoals:[],interests:[],professionalField:'',dailyGoalMinutes:20,preferredStudyTime:'Morning',supportLanguage:'English + Kurdish Sorani',uiLang:'en',onboardingComplete:true,placementComplete:true,assessment,roadmap:null};
@@ -113,12 +113,12 @@ try{
  await click('More');await click('Settings');await wait('document.body.innerText.includes("My Account")');
  assert.equal(await ev(`document.body.innerText.includes('You are currently learning as a guest.')`),true);
  await ev(`window.qa.user={id:'mock-user',email:'mock@example.test',verified:true};window.qa.account={fullName:'Mock Account',email:'mock@example.test',verified:true,providers:['email'],twoFactor:'not_enrolled'};window.dispatchEvent(new Event('englishco-auth-change'))`);
- await wait('document.body.innerText.includes("Mock Account")');
+ await wait("document.querySelector('[data-entry-state=account]')");await click('More');await click('Settings');await wait('document.body.innerText.includes("Mock Account")');
  assert.equal(await ev(`document.querySelector('aside').textContent.includes('Local QA Learner')`),true);
- await ev(`window.qa.user=null;window.qa.account=null;window.dispatchEvent(new Event('englishco-auth-change'))`);await wait('!document.body.innerText.includes("mock@example.test")');
+ await ev(`window.qa.user=null;window.qa.account=null;window.dispatchEvent(new Event('englishco-auth-change'))`);await wait('location.pathname==="/account" && document.querySelector("input[name=email]")');assert.equal(await ev('document.body.innerText.includes("mock@example.test")'),false);
  assert.equal(await ev('localStorage.getItem("cadence:guest-id")'),'integration-fixture');
  reports.push('Mobile More -> Profile and Settings -> My Account retained; separate local learner/account display and stale account clearing');
- await click('Pronunciation');
+ await nav();await click('Pronunciation');
  await ev(`Object.defineProperty(window,'AudioWorkletNode',{value:undefined,configurable:true});true`);
  await click('Home');await click('Pronunciation');await wait('document.querySelector(".ec-pronunciation [role=alert]")');
  assert.equal(await ev(`[...document.querySelectorAll('.ec-pronunciation button')].find(b=>b.textContent==='Start recording').disabled`),true);

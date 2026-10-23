@@ -38,6 +38,7 @@ try {
    await new Promise(resolve=>setTimeout(resolve,150));
    if(window.qa.result==='network')throw Error('fixture failure');
    if(window.qa.result==='delivery')return Response.json({error:'delivery'},{status:503});
+   if(window.qa.result==='rateUnknown')return Response.json({error:'rate'},{status:429});
    if(window.qa.result==='rate')return Response.json({error:'rate',retryAfter:60},{status:429});
    if(window.qa.result==='credentials')return Response.json({error:'credentials'},{status:401});
    if(window.qa.result==='verify')return Response.json({error:'verify'},{status:403});
@@ -71,6 +72,12 @@ try {
  await wait("document.querySelector('[role=alert]')?.textContent.includes('couldn’t request the email')");
  assert.equal(await evaluate("document.querySelector('h1').textContent"),'Create your English-Co account');
  assert.equal(await evaluate("document.querySelectorAll('input').length"),4);reports.push('Registration delivery failure never shows verification success');
+ await evaluate("window.qa.result='rateUnknown'");await submit();
+ await wait("document.querySelector('[role=alert]')?.textContent.includes('Please wait')");
+ assert.equal(await evaluate("document.querySelector('h1').textContent"),'Create your English-Co account');
+ assert.equal(await evaluate("document.querySelector('button[type=submit]').disabled"),false);
+ assert.equal(await evaluate("document.body.innerText.includes('60s') || document.body.innerText.includes('Resend in')"),false);
+ reports.push('Unknown provider retry duration shows a neutral rate error without a fabricated countdown');
  await evaluate("window.qa.calls=[];window.qa.result='success'");
  await evaluate("document.querySelector('form').requestSubmit();document.querySelector('form').dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));");
  assert.equal(await evaluate("document.querySelector('button[type=submit]').disabled"),true);

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import ts from 'typescript';
 import {createServerClient} from '@supabase/ssr';
+import {AuthApiError} from '@supabase/supabase-js';
 import {createHash} from 'node:crypto';
 import {mfaPolicyUrl,withSecurity} from './mfa-fixture.mjs';
 import {ACCOUNT_PATH, callbackDestination, publicUser, requestOrigin, validEmail, validPassword, allowAttempt, reserveEmailRequest} from '../lib/supabase/auth-policy.ts';
@@ -90,22 +91,25 @@ test('duplicate signup receives the same neutral verification response as a new 
   const normal=await run(credentials('signup'));
   const duplicate=await run(credentials('signup'),{signUp:{data:{session:null},error:{code:'user_already_exists',status:422}}});
   assert.deepEqual(duplicate.body,normal.body);
+  const obfuscated=await run(credentials('signup'),{signUp:{data:{session:null,user:{...verified,identities:[]}},error:null}});
+  assert.deepEqual(obfuscated.body,normal.body);
 });
 test('signup email restrictions, provider failures and unexpected errors never claim success',async()=>{
   for(const error of [{code:'email_address_not_authorized',status:400},{code:'signup_disabled',status:422},{code:'unexpected_failure',status:500},{code:'weak_password',status:422}]) {
-    const result=await run(credentials('signup'),{signUp:{data:{session:null,user:null},error}});
+    const result=await run(credentials('signup'),{signUp:{data:{session:null,user:null},error:new AuthApiError('Synthetic provider failure',error.status,error.code)}});
     assert.equal(result.response.ok,false);
     assert.equal(result.body.message,undefined);
     assert.deepEqual(result.calls.map(call=>call[0]),['signUp']);
     assert.equal(JSON.stringify(result.body).includes(error.code),false);
   }
 });
-test('provider email rate limits return retry instructions rather than a sent-email message',async()=>{
+test('provider email rate limits never invent a retry duration or claim email success',async()=>{
   for(const action of ['signup','resend','recover']) {
     const method={signup:'signUp',resend:'resend',recover:'resetPasswordForEmail'}[action];
-    const result=await run(credentials(action),{[method]:{data:{session:null},error:{code:'over_email_send_rate_limit',status:429}}});
-    assert.equal(result.response.status,429);assert.equal(result.response.headers.get('retry-after'),'60');
-    assert.equal(result.body.retryAfter,60);assert.equal(result.body.message,undefined);
+    const result=await run(credentials(action),{[method]:{data:{session:null},error:new AuthApiError('Synthetic provider rate limit',429,'over_email_send_rate_limit')}});
+    assert.equal(result.response.status,429);assert.equal(result.response.headers.get('retry-after'),null);
+    assert.equal(result.body.retryAfter,undefined);assert.equal(result.body.message,undefined);
+    assert.deepEqual(result.calls.map(call=>call[0]),[method]);
   }
 });
 test('repeated email requests are blocked before another SDK call',async()=>{
@@ -155,6 +159,9 @@ test('logout requests local session revocation without touching legacy identitie
 test('network/configuration failures return safe availability errors',async()=>{
   const response=await handleAuth(request(credentials()),async()=>{throw new Error('private credential');});
   assert.equal(response.status,503);assert.deepEqual(await response.json(),{error:'unavailable'});
+  const f=fixture();f.client.auth.signUp=async()=>{throw new TypeError('Synthetic network failure')};
+  const signup=await handleAuth(request(credentials('signup')),async()=>f.client);
+  assert.equal(signup.status,503);assert.deepEqual(await signup.json(),{error:'unavailable'});
 });
 test('verified identity projection excludes metadata, tokens and unverified users',()=>{
   assert.equal(publicUser(null),null);assert.equal(publicUser({id:'forged'}),null);

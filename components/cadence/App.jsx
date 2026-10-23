@@ -1,3 +1,4 @@
+import { RecoveredLearning } from './RecoveredLearning.jsx';
 import { PLACEMENT_VERSION, PLACEMENT_QUESTIONS, scorePlacement, hasValidPlacement, getPlacementDraft, orderPlacementOptions } from './placement.js';
 import { LEVEL_CATALOG, assignedCurriculum, lessonPublished, mayCompleteLesson, levelProgress, parseLessonProgress } from './curriculum.js';
 const levelProgressKey = email => `level_progress:${email.trim().toLowerCase()}`;
@@ -6,7 +7,7 @@ import { translate } from "./i18n.js";
 import SupabaseAccount from '../SupabaseAccount';
 import AccountDetails from '../AccountDetails';
 import React, { useState, useContext, createContext, useEffect } from "react";
-import { Mic, Home, CalendarCheck, BookOpen, Layers, TrendingUp, User, Settings as SettingsIcon, Sun, Moon, Flame, Star, Clock, ChevronRight, X, Check, Award, BookMarked, ArrowRight, RotateCcw, Pencil, Grid3x3, Lock, ShieldCheck, Trophy, Mail, Eye, EyeOff, ArrowLeft, Loader2, LogIn, UserPlus, GraduationCap, Plus } from "lucide-react";
+import { Mic, Home, CalendarCheck, BookOpen, Layers, TrendingUp, User, Settings as SettingsIcon, Sun, Moon, Flame, Star, Clock, ChevronRight, X, Check, Award, BookMarked, ArrowRight, RotateCcw, Pencil, Grid3x3, Lock, ShieldCheck, Trophy, Mail, Eye, EyeOff, ArrowLeft, Loader2, LogIn, UserPlus, GraduationCap, Plus, Target, AlertTriangle, MessageCircle, PhoneCall } from "lucide-react";
 const cx = (...parts) => parts.filter(Boolean).join(" ");
 const ThemeContext = createContext(null);
 const useTheme = () => useContext(ThemeContext);
@@ -39,6 +40,7 @@ const STRINGS = {
     nav_settings: "Settings",
     nav_more: "More",
     nav_roadmap: "Roadmap",
+    nav_daily: "Daily Lesson", nav_library: "Courses", nav_practice: "Practice", nav_mistakes: "Mistakes", nav_activity: "Learning activity", nav_tutor: "Tutor", nav_aicall: "AI Call", nav_levelhome: "My level", nav_preferences: "Learning preferences",
     signIn: "Sign in",
     signUp: "Sign up",
     signOut: "Sign out",
@@ -63,6 +65,8 @@ const STRINGS = {
     appLanguage: "App language"
   },
   ku: {
+    nav_preferences: "پرۆفایلی فێربوون",
+    nav_library: "کۆرسەکان", nav_practice: "ڕاهێنان", nav_mistakes: "هەڵەکان", nav_activity: "چالاکیی فێربوون", nav_tutor: "مامۆستا", nav_aicall: "پەیوەندی AI", nav_levelhome: "ئاستەکەم",
     nav_home: "سەرەکی",
     nav_daily: "وانەی ڕۆژانە",
     nav_courses: "\u0648\u0627\u0646\u06D5\u06A9\u0627\u0646\u0645",
@@ -493,7 +497,17 @@ const NAV = [{
   id: "home",
   label: "Home",
   icon: Home
-}, {
+},   {id:"daily",label:"Daily Lesson",icon:CalendarCheck},
+  {id:"library",label:"Courses",icon:BookOpen},
+  {id:"practice",label:"Practice",icon:Target},
+  {id:"mistakes",label:"Mistakes",icon:AlertTriangle},
+  {id:"roadmap",label:"Roadmap",icon:TrendingUp},
+  {id:"activity",label:"Learning activity",icon:TrendingUp},
+  {id:"tutor",label:"Tutor",icon:MessageCircle},
+  {id:"aicall",label:"AI Call",icon:PhoneCall},
+  {id:"levelhome",label:"My level",icon:GraduationCap},
+  {id:"preferences",label:"Learning preferences",icon:SettingsIcon},
+{
   id: "courses",
   label: "My lessons",
   icon: BookOpen
@@ -544,7 +558,7 @@ function Logo({
       {!compact && <span className={cx("text-lg font-bold tracking-tight truncate", isDark ? "text-slate-50" : "text-slate-900")} style={{
       fontFamily: "var(--font-display)"
     }}>
-          Cadence
+          English-Co
         </span>}
     </div>;
 }
@@ -997,7 +1011,7 @@ function HomePage({
     currentUser
   } = useAuth();
   const level = assignedCurriculum(profile.assessment);
-  return <div className="space-y-6 pb-6"><PageHeader title={'Welcome, ' + currentUser.name} subtitle="Your learning starts with your assigned level" /><Card className="space-y-4"><Badge><UIText text="Placement completed" /></Badge><h2 className={cx('text-2xl font-bold', t.text)}><UIText text="Level" /> {level.number} · {level.cefr}</h2><p className={cx('text-sm', t.textSoft)}><UIText text="Your lessons are selected from the texts assigned to this level." /></p><PrimaryButton full onClick={() => onNavigate('courses')}><UIText text="Open my lessons" /></PrimaryButton></Card><Card><SectionHeading title="Ready for your teacher's texts" /><p className={cx('text-sm leading-relaxed', t.textSoft)}><UIText text="The previous course library has been replaced. Lesson slots are ready; the actual texts will be added later." /></p></Card></div>;
+  return <div className="space-y-6 pb-6"><PageHeader title={'Welcome, ' + currentUser.name} subtitle="Your learning starts with your assigned level" /><Card className="space-y-4"><Badge><UIText text="Placement completed" /></Badge><h2 className={cx('text-2xl font-bold', t.text)}><UIText text="Level" /> {level.number} · {level.cefr}</h2><p className={cx('text-sm', t.textSoft)}><UIText text="Your lessons are selected from the texts assigned to this level." /></p><PrimaryButton full onClick={() => onNavigate('courses')}><UIText text="Open my lessons" /></PrimaryButton></Card><Card><SectionHeading title="Ready for your teacher's texts" /><p className={cx('text-sm leading-relaxed', t.textSoft)}><UIText text="Your assigned lesson slots are ready; teacher texts will be added later. Courses and daily lessons are available from the main navigation." /></p></Card></div>;
 }
 function genId() {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -2009,7 +2023,10 @@ function PronunciationPage() {
   return <PronunciationPanel level={profile.assessment.assignedLevel} studentKey={currentUser.email} uiLang={uiLang} isDark={isDark}/>;
 }
 function AppShell() {
-  const [page, setPage] = useState('courses'),
+  const recoveryAuth = useAuth();
+  const recoveryTheme = useTheme();
+  const recovered = id => <RecoveredLearning key={id} page={id} onNavigate={navigate} auth={recoveryAuth} theme={recoveryTheme}/>;
+  const [page, setPage] = useState('home'),
     [moreOpen, setMoreOpen] = useState(false);
   const {
     isRTL
@@ -2021,13 +2038,17 @@ function AppShell() {
   const renderPage = () => {
     switch (page) {
       case 'home':
+        return <div className="space-y-6"><div className="flex items-center justify-between gap-3"><Badge><UIText text="Placement completed"/></Badge><button className="text-sm text-teal-600 underline" onClick={()=>navigate('courses')}><UIText text="My lessons"/></button></div>{recovered('home')}</div>;
+      case 'levelhome':
         return <HomePage onNavigate={navigate} />;
+      case 'preferences': case 'daily': case 'library': case 'practice': case 'mistakes': case 'roadmap': case 'activity': case 'tutor': case 'aicall':
+        return recovered(page);
       case 'courses':
         return <CoursesPage />;
       case 'pronunciation':
         return <PronunciationPage />;
       case 'vocabulary':
-        return <VocabularyPage />;
+        return recovered('vocabulary');
       case 'progress':
         return <ProgressPage />;
       case 'profile':
@@ -2061,7 +2082,6 @@ export default function App() {
       <AuthProvider>
         <div className={cx(isDark ? "dark" : "", "min-h-screen", isDark ? "bg-slate-950" : "bg-slate-50")}>
           <AppNotice />
-          <a href="/practice-library" className="block px-4 py-2 text-center underline">{localStorage.getItem("cadence:ui-language")==="ku"?"???????? ?????":"More practice"}</a>
           <GlobalStyle />
           <RootGate />
         </div>

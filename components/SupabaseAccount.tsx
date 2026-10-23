@@ -136,7 +136,7 @@ export default function SupabaseAccount() {
       if(!response.ok) {
         if(data.error==='mfa_required'){setPassword('');setConfirm('');setUser(null);setMode('mfa');history.replaceState(null,'','/account?provider=supabase&mode=mfa'+(recoveryReturn.current?'&after=recovery':''));return;}
         setError(data.error || 'unavailable');
-        if(response.status===429)cooldown(data.retryAfter);
+        if(response.status===429 && typeof data.retryAfter==='number' && Number.isFinite(data.retryAfter) && data.retryAfter>0)cooldown(data.retryAfter);
         if(data.error==='password')setFieldErrors({password:'password'});
         return;
       }

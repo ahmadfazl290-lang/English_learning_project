@@ -1,3 +1,3 @@
-import CadenceClient from '../components/CadenceClient';
+import EntryController from '../components/EntryController';
 export const dynamic='force-dynamic';
-export default function Home(){return <CadenceClient/>;}
+export default function Home(){return <EntryController/>;}

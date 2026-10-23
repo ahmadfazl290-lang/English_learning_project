@@ -11,7 +11,7 @@ const limited = (seconds: number) => {
 };
 function emailError(error: {code?: string; status?: number} | null) {
   if (!error || ['user_already_exists','email_exists','user_not_found'].includes(error.code || '')) return null;
-  if (error.status === 429 || ['over_email_send_rate_limit','over_request_rate_limit'].includes(error.code || '')) return limited(EMAIL_COOLDOWN_SECONDS);
+  if (error.status === 429 || ['over_email_send_rate_limit','over_request_rate_limit'].includes(error.code || '')) return json({error:'rate'},429); // The SDK error carries no provider retry duration.
   if (error.code === 'weak_password') return json({error:'password'},400);
   if (['email_address_not_authorized','email_provider_disabled','email_address_invalid'].includes(error.code || '')) return json({error:'delivery'},503);
   return json({error:'unavailable'},503);
